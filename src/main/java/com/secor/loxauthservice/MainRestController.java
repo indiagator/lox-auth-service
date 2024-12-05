@@ -1,5 +1,6 @@
 package com.secor.loxauthservice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,12 +24,15 @@ public class MainRestController {
 
     CredentialRepository credentialRepository;
    AuthtokenRepository authtokenRepository;
+   Producer producer;
 
    MainRestController(CredentialRepository credentialRepository,
-                      AuthtokenRepository authtokenRepository)
+                      AuthtokenRepository authtokenRepository,
+                      Producer producer)
    {
        this.credentialRepository = credentialRepository;
        this.authtokenRepository = authtokenRepository;
+       this.producer = producer;
    }
 
    @GetMapping("/get/instance/id")
@@ -39,15 +43,14 @@ public class MainRestController {
 
     @PostMapping("/signup")
     public ResponseEntity<Credential> signup(@RequestParam("username") String username,
-                                             @RequestParam("password") String password)
-    {
+                                             @RequestParam("password") String password) throws JsonProcessingException {
         Credential credential = new Credential();
         credential.setUsername(username);
         credential.setPassword(password);
-
         credentialRepository.save(credential);
-
         credential.setPassword("*********");
+
+        producer.publishAuthDatum(username,"NEW SIGNUP");
 
         return ResponseEntity.ok(credential);
     }
@@ -56,8 +59,7 @@ public class MainRestController {
     public ResponseEntity<LoxAuthentication> login(
                         @RequestParam("username") String username,
                         @RequestParam("password") String password
-                       )
-    {
+                       ) throws JsonProcessingException {
         Credential credential = credentialRepository.findById(username).orElse(null);
         if (credential != null && credential.getPassword().equals(password))
         {
@@ -75,6 +77,8 @@ public class MainRestController {
             loxAuthentication.setAuthtoken(authtoken);
             loxAuthentication.setMessage("LOGIN SUCCESSFUL");
 
+            producer.publishAuthDatum(username,"LOGIN SUCCESSFUL");
+
             return ResponseEntity.ok(loxAuthentication);
         }
         else
@@ -82,6 +86,9 @@ public class MainRestController {
             LoxAuthentication loxAuthentication = new LoxAuthentication();
             loxAuthentication.setAuthenticated(false);
             loxAuthentication.setMessage("INVALID CREDENTIALS");
+
+            producer.publishAuthDatum(username,"LOGIN UNSUCCESSFUL");
+
             return ResponseEntity.status(HttpStatusCode.valueOf(401)).body(loxAuthentication);
         }
     }
@@ -89,8 +96,7 @@ public class MainRestController {
     @PostMapping("/validate")
     public ResponseEntity<Authtoken> validate(
             @RequestHeader("Sectoken") String token
-    )
-    {
+    ) throws JsonProcessingException {
 
         log.info("TOKEN VALIDATION STARTED...");
 
@@ -109,9 +115,14 @@ public class MainRestController {
                 badAuthToken.setExpirytime(0);
                 badAuthToken.setToken("TOKENEXPIRED");
                 log.info("TOKEN EXPIRED");
+
+                producer.publishAuthDatum(authtoken.getUsername(),"EXPIRED TOKEN");
+
                 return ResponseEntity.status(HttpStatusCode.valueOf(401)).body(badAuthToken);
 
             }
+
+            producer.publishAuthDatum(authtoken.getUsername(), "TOKEN VALIDATED");
 
             log.info("TOKEN VALIDATED SUCCESSFULY"+authtoken);
             return ResponseEntity.ok(authtoken);
@@ -124,6 +135,9 @@ public class MainRestController {
             badAuthToken.setExpirytime(0);
             badAuthToken.setToken("INVALIDTOKEN");
             log.info("TOKEN INVALID");
+
+            producer.publishAuthDatum("","INVALID TOKEN");
+
             return ResponseEntity.status(HttpStatusCode.valueOf(401)).body(badAuthToken);
         }
     }
