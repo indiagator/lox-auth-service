@@ -2,6 +2,7 @@ package com.secor.loxauthservice;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
@@ -17,6 +18,8 @@ public class MainRestController {
 
     private static final Logger log = LoggerFactory.getLogger(MainRestController.class);
 
+    @Value("${instance.id}")
+    private String instance_id;
 
     CredentialRepository credentialRepository;
    AuthtokenRepository authtokenRepository;
@@ -26,6 +29,12 @@ public class MainRestController {
    {
        this.credentialRepository = credentialRepository;
        this.authtokenRepository = authtokenRepository;
+   }
+
+   @GetMapping("/get/instance/id")
+   public ResponseEntity<String> getInstanceId()
+   {
+       return ResponseEntity.ok(instance_id);
    }
 
     @PostMapping("/signup")
