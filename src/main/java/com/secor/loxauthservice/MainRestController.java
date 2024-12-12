@@ -38,6 +38,7 @@ public class MainRestController {
    @GetMapping("/get/instance/id")
    public ResponseEntity<String> getInstanceId()
    {
+       log.info("INSTANCE ID REQUESTED");
        return ResponseEntity.ok(instance_id);
    }
 
